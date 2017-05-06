@@ -10,10 +10,11 @@ document.addEventListener('DOMContentLoaded', function() {
     this.height = height;
   };
 
-  var Bat = function(width, height, arena) {
+  var Bat = function(label, width, height, arena) {
     this.body = null;
     this.arena = arena;
     this.width = width;
+    this.label = label;
     this.height = height;
     this.movement = parseInt(this.arena.width * 0.007);
   };
@@ -21,17 +22,20 @@ document.addEventListener('DOMContentLoaded', function() {
   Bat.prototype.draw = function(coords) {
     if (!this.bat) {
       var renderData = {
+        label: this.label,
         isStatic: true,
         render: {
-          fillStyle: 'white'
+          fillStyle: 'white',
+          strokeStyle: 'transparent',
+          lineWidth: 0
         }
       };
       this.body = Bodies.rectangle(coords.x, coords.y, this.width,
           this.height, renderData);
-      this.body.friction = 1;
+      this.body.restitution = 1;
+      this.body.friction = 0;
       this.body.frictionStatic = 1;
-      this.body.restitution = 0.6;
-      Matter.Body.setVelocity(this.body, { x: 1, y: 1 });
+      this.body.frictionAir = 0;
     }
   };
 
@@ -53,8 +57,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
 
-  var Ball = function(radius, arena) {
+  var Ball = function(label, radius, arena) {
     this.body = null;
+    this.label = label;
     this.arena = arena;
     this.radius = radius;
   };
@@ -62,14 +67,18 @@ document.addEventListener('DOMContentLoaded', function() {
   Ball.prototype.draw = function(coords) {
     if (!this.body) {
       var renderData = {
+        label: this.label,
         render: {
-          fillStyle: 'seagreen'
+          fillStyle: 'seagreen',
+          strokeStyle: 'transparent',
+          lineWidth: 0
         }
       };
       this.body = Bodies.circle(coords.x, coords.y, this.radius, renderData);
-      this.body.restitution = 0.8;
-      Matter.Body.setAngularVelocity(this.body, 6);
-      Matter.Body.setVelocity(this.body, { x: 1, y: 1 });
+      this.body.restitution = 1;
+      this.body.friction = 0;
+      this.body.frictionStatic = 1;
+      this.body.frictionAir = 0;
     }
   };
 
@@ -128,25 +137,38 @@ var init = function() {
   });
 
   var arena = new Game.Arena(MAX_WIDTH, MAX_HEIGHT);
-  var playerBat = new Game.Bat(BAT_WIDTH, BAT_HEIGHT, arena);
+  var playerBat = new Game.Bat('playerBat', BAT_WIDTH, BAT_HEIGHT, arena);
   playerBat.draw({
-    x: BAT_WIDTH + (BAT_WIDTH / 2),
-    y: MAX_HEIGHT - BAT_HEIGHT * 2.
+    x: (MAX_WIDTH - BAT_WIDTH) / 2,
+    y: MAX_HEIGHT - BAT_HEIGHT * 2
   });
 
-  var compBat = new Game.Bat(BAT_WIDTH, BAT_HEIGHT, arena);
+  var compBat = new Game.Bat('compBat', BAT_WIDTH, BAT_HEIGHT, arena);
   compBat.draw({
-    x: BAT_WIDTH + (BAT_WIDTH / 2),
+    x: (MAX_WIDTH - BAT_WIDTH) / 2 + 70,
     y: BAT_HEIGHT
   });
 
-  var ball = new Game.Ball(BALL_RADIUS, arena);
+  var lFence = new Game.Bat('lFence', 2, MAX_HEIGHT, arena);
+  lFence.draw({
+    x: 0,
+    y: MAX_HEIGHT / 2
+  });
+
+  var rFence = new Game.Bat('rFence', 2, MAX_HEIGHT, arena);
+  rFence.draw({
+    x: MAX_WIDTH,
+    y: MAX_HEIGHT / 2
+  });
+
+  var ball = new Game.Ball('ball', BALL_RADIUS, arena);
   ball.draw({
     x: MAX_WIDTH / 2,
     y: MAX_HEIGHT / 2
   });
 
-  Game.World.add(engine.world, [playerBat.body, compBat.body, ball.body]);
+  Game.World.add(engine.world, [playerBat.body, compBat.body, 
+    lFence.body, rFence.body, ball.body]);
   Game.Engine.run(engine);
   Game.Render.run(render);
 
@@ -158,11 +180,44 @@ var init = function() {
     flipKey(e, false);
   });
 
+  var CollisionState = {};
+
   Matter.Events.on(engine, 'beforeUpdate', function (e) {
     if (ActiveKeys.LEFT) {
       playerBat.moveLeft();
     } else if (ActiveKeys.RIGHT) {
       playerBat.moveRight();
     }
+  });
+
+  Matter.Events.on(engine, 'beforeUpdate', function (e) {
+    var force = null;
+    if (CollisionState.playerBat & CollisionState.ball) {
+      force = { x: 0.004, y: -0.025 };
+    } else if (CollisionState.compBat & CollisionState.ball) {
+      force = { x: 0.004, y: 0.025 };
+    }
+
+    if (force) {
+      Matter.Body.applyForce(ball.body, playerBat.body.position, force);
+    }
+  });
+
+
+  Matter.Events.on(engine, 'collisionStart', function(e) {
+    var pairs = e.pairs;
+    for (var i = 0; i < pairs.length; i++) {
+      var p = pairs[i];
+      CollisionState[p.bodyA.label] = true;
+      CollisionState[p.bodyB.label] = true;
+    }
+  });
+
+  Matter.Events.on(engine, 'collisionEnd', function(e) {
+    CollisionState = {
+      playerBat: false,
+      compBat: false,
+      ball: false
+    };
   });
 };
