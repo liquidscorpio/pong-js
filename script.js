@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
       };
       this.body = Bodies.rectangle(coords.x, coords.y, this.width,
           this.height, renderData);
-      this.body.restitution = 1;
+      this.body.restitution = 0.5;
       this.body.friction = 0;
       this.body.frictionStatic = 1;
       this.body.frictionAir = 0;
@@ -75,10 +75,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       };
       this.body = Bodies.circle(coords.x, coords.y, this.radius, renderData);
-      this.body.restitution = 1;
-      this.body.friction = 0;
+      this.body.restitution = 0.5;
+      this.body.friction = 0.3;
       this.body.frictionStatic = 1;
-      this.body.frictionAir = 0;
+      this.body.frictionAir = 0.0005;
     }
   };
 
@@ -192,14 +192,23 @@ var init = function() {
 
   Matter.Events.on(engine, 'beforeUpdate', function (e) {
     var force = null;
+    var y = ball.body.velocity.y;
     if (CollisionState.playerBat & CollisionState.ball) {
-      force = { x: 0.004, y: -0.025 };
+      force = { x: 0.004, y: -0.04 };
     } else if (CollisionState.compBat & CollisionState.ball) {
-      force = { x: 0.004, y: 0.025 };
+      force = { x: 0.004, y: 0 };
     }
 
     if (force) {
       Matter.Body.applyForce(ball.body, playerBat.body.position, force);
+    }
+  });
+
+  Matter.Events.on(engine, 'beforeUpdate', function(e) {
+    var v = ball.body.velocity.y;
+    var d = ball.body.position.x;
+    if (v < 0) {
+      Matter.Body.setPosition(compBat.body, { x: d, y: compBat.body.position.y });
     }
   });
 
